@@ -17,7 +17,7 @@ async function sendDiscordNotification(payload: {
   const webhookUrl =
     process.env.DISCORD_WEBHOOK_URL ||
     process.env.VITE_DISCORD_WEBHOOK_URL ||
-    "";
+    "https://discord.com/api/webhooks/1564752151077716148/i9y3d1rfJqQ-GKiOus4uL9GlDuzfN1yA2eaRgKURAQpO54BJo6f02IkIyHLVk857Vh2Z";
 
   if (!webhookUrl) {
     console.warn("[Discord] DISCORD_WEBHOOK_URL não configurada — notificação ignorada.");

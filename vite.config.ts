@@ -9,6 +9,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 export default defineConfig({
+  nitro: {
+    preset: process.env.NITRO_PRESET || (process.env.VERCEL ? "vercel" : "vercel"),
+  },
   vite: {
     plugins: [
       {
