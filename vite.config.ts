@@ -49,12 +49,12 @@ export default defineConfig({
               req.on("end", async () => {
                 try {
                   const body = JSON.parse(raw || "{}");
-                  const amount = Math.round(Number(body.amount || 20) * 100);
-                  const apiKey =
-                    process.env.PROMISSE_API_KEY ||
-                    "sk_live_FpKSi1ejC/mJoQdUCjsIw5md/y2Fb8ozL1Zb9xzukkewmuR4bq5r5jXC5lqAjq/ww4CbhRGl6anwe3TU3LDpGw==";
+                  const rawAmount = body.amount ?? body.value;
+                  const parsedAmount = typeof rawAmount === "number" ? rawAmount : parseFloat(String(rawAmount || ""));
+                  const amountInReais = !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : 20;
+                  const amount = Math.round(amountInReais * 100);
 
-                  console.log(`[PromissePay] Criando transação PIX: R$ ${(amount / 100).toFixed(2)} (${amount} centavos)`);
+                  console.log(`[PromissePay] Criando transação PIX: R$ ${amountInReais.toFixed(2)} (${amount} centavos)`);
 
                   let promisseRes = await fetch("https://api.promisse.com.br/transactions", {
                     method: "POST",

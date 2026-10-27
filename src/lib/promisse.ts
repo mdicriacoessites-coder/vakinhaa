@@ -11,7 +11,10 @@ export interface GeneratedPixResult {
  * Isso garante que o código PIX e QR Code gerados sejam 100% autênticos e válidos no Banco Central.
  */
 export async function createPromissePix(amountInReais: number): Promise<GeneratedPixResult> {
-  const amount = Number(amountInReais || 20);
+  const rawNum = typeof amountInReais === "number" ? amountInReais : parseFloat(String(amountInReais || ""));
+  const amount = !isNaN(rawNum) && rawNum > 0 ? rawNum : 20;
+
+  console.log(`[PromissePay] Solicitando PIX no valor de R$ ${amount.toFixed(2)}`);
 
   const response = await fetch("/api/promisse/pix", {
     method: "POST",

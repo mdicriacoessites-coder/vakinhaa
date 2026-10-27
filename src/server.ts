@@ -142,8 +142,10 @@ export default {
     // Endpoint server-side do PIX da PromissePay (Evita CORS e protege chave)
     if (url.pathname === "/api/promisse/pix" && request.method === "POST") {
       try {
-        const body = (await request.json().catch(() => ({}))) as { amount?: number };
-        const amountInReais = Number(body?.amount || 20);
+        const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+        const rawAmount = body?.amount ?? body?.value;
+        const parsedAmount = typeof rawAmount === "number" ? rawAmount : parseFloat(String(rawAmount || ""));
+        const amountInReais = !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : 20;
         const amountInCents = Math.round(amountInReais * 100);
         const apiKey =
           process.env.PROMISSE_API_KEY ||
@@ -261,26 +263,72 @@ export default {
           console.log("[Webhook PromissePay] Payload recebido:", JSON.stringify(rawBody));
 
           // Normaliza campos comuns
-          const event       = String(rawBody.event || rawBody.type || rawBody.status || "").toLowerCase();
-          const txId        = String(rawBody.id || rawBody.transaction_id || (rawBody.transaction as any)?.id || "");
-          const rawAmount   = rawBody.amount ?? rawBody.value ?? (rawBody.transaction as any)?.amount;
-          const amountCents = Number(rawAmount || 0);
-          // Se valor vier em centavos (> 99 sempre que for ao menos R$1), converte
-          const amountReais = amountCents > 100 ? amountCents / 100 : amountCents;
-          const pixCode     = String(
-            rawBody.copyPaste || rawBody.pix_code || rawBody.copy_paste || rawBody.emv || ""
+          const rawEvent = String(
+            rawBody.event ||
+            rawBody.type ||
+            rawBody.status ||
+            (rawBody.data as any)?.status ||
+            (rawBody.data as any)?.event ||
+            (rawBody.transaction as any)?.status ||
+            ""
+          ).toLowerCase();
+
+          const txId = String(
+            rawBody.id ||
+            rawBody.transaction_id ||
+            (rawBody.data as any)?.id ||
+            (rawBody.data as any)?.transaction_id ||
+            (rawBody.transaction as any)?.id ||
+            (rawBody.data as any)?.transaction?.id ||
+            ""
           );
-          const status      = String(
-            rawBody.status || (rawBody.transaction as any)?.status || ""
+
+          // Extrai o valor procurando em qualquer nível do payload
+          const rawAmount =
+            rawBody.amount ??
+            rawBody.value ??
+            (rawBody.data as any)?.amount ??
+            (rawBody.data as any)?.value ??
+            (rawBody.transaction as any)?.amount ??
+            (rawBody.transaction as any)?.value ??
+            (rawBody.data as any)?.transaction?.amount ??
+            (rawBody.data as any)?.transaction?.value;
+
+          let amountReais: number | undefined;
+          if (rawAmount != null) {
+            const num = typeof rawAmount === "number" ? rawAmount : parseFloat(String(rawAmount).replace(",", "."));
+            if (!isNaN(num) && num > 0) {
+              // Na PromissePay valores inteiros >= 100 são centavos (ex: 2000 = R$ 20, 3500 = R$ 35, 10000 = R$ 100)
+              amountReais = Number.isInteger(num) && num >= 100 ? num / 100 : num;
+            }
+          }
+
+          const pixCode = String(
+            rawBody.copyPaste ||
+            rawBody.pix_code ||
+            rawBody.copy_paste ||
+            rawBody.emv ||
+            (rawBody.data as any)?.copyPaste ||
+            (rawBody.data as any)?.pix_code ||
+            (rawBody.transaction as any)?.copyPaste ||
+            ""
+          );
+
+          const status = String(
+            rawBody.status ||
+            (rawBody.data as any)?.status ||
+            (rawBody.transaction as any)?.status ||
+            rawEvent ||
+            ""
           );
 
           // Determina tipo do evento
           let eventType: "pix_generated" | "payment_confirmed" | "payment_failed" | "unknown" = "unknown";
-          if (/paid|approved|confirmed|success|completed/i.test(event) || /paid|approved|confirmed|success|completed/i.test(status)) {
+          if (/paid|approved|confirmed|success|completed/i.test(rawEvent) || /paid|approved|confirmed|success|completed/i.test(status)) {
             eventType = "payment_confirmed";
-          } else if (/pix.*gen|created|pending|waiting|generated/i.test(event) || /pending|waiting|created/i.test(status)) {
+          } else if (/pix.*gen|created|pending|waiting|generated/i.test(rawEvent) || /pending|waiting|created/i.test(status)) {
             eventType = "pix_generated";
-          } else if (/fail|error|cancel|reject/i.test(event) || /fail|error|cancel|reject/i.test(status)) {
+          } else if (/fail|error|cancel|reject/i.test(rawEvent) || /fail|error|cancel|reject/i.test(status)) {
             eventType = "payment_failed";
           }
 

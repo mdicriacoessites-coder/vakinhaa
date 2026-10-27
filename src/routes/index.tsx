@@ -133,11 +133,22 @@ function DogShelterCampaignPage() {
   const [confirmedSuccess, setConfirmedSuccess] = useState(false);
 
   // Calcula valor final
-  const currentDonationAmount = selectedVal !== null ? selectedVal : Number(customVal) || 0;
+  const currentDonationAmount =
+    selectedVal !== null
+      ? selectedVal
+      : Number(customVal) && Number(customVal) > 0
+      ? Number(customVal)
+      : 20;
 
-  const handleGeneratePix = async (valOverride?: number) => {
-    const val = valOverride !== undefined ? valOverride : currentDonationAmount;
-    if (val < 1) {
+  const handleGeneratePix = async (valOverride?: unknown) => {
+    // Garante que só usa override se for um número válido (evita que MouseEvent do onClick vire NaN)
+    const numericOverride =
+      typeof valOverride === "number" && !isNaN(valOverride) && valOverride > 0
+        ? valOverride
+        : undefined;
+
+    const val = numericOverride !== undefined ? numericOverride : currentDonationAmount;
+    if (!val || val < 1) {
       return toast.error("Informe um valor para sua doação.");
     }
 
@@ -824,7 +835,7 @@ function DonationCard({
         size="lg"
         disabled={isGenerating}
         className="mt-4 w-full text-sm sm:text-base font-extrabold shadow-md gap-2 h-12"
-        onClick={onGeneratePix}
+        onClick={() => onGeneratePix()}
       >
         {isGenerating ? (
           <>
